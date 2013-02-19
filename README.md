@@ -1,6 +1,6 @@
-# Capistrano::File::Transfer::Ext
+# Capistrano::Configuration::Actions::FileTransferExt
 
-TODO: Write a gem description
+A sort of utilities which helps you transferring files with Capistrano.
 
 ## Installation
 
@@ -18,7 +18,14 @@ Or install it yourself as:
 
 ## Usage
 
-TODO: Write usage instructions here
+Add `require` line in your `Capfile` or `config/deploy.rb` or so.
+
+    require "capistrano/configuration/actions/file_transfer_ext"
+
+`file_transfer_ext` provides following additional file transfer actions. You can use them in your tasks.
+
+  * `safe_put` - Store the contents of multiple servers, with comparing the difference of the contents.
+  * `safe_upload` - Transfers a file from the local host to multiple remote hosts, with comparing the difference of the contents.
 
 ## Contributing
 
@@ -27,3 +34,12 @@ TODO: Write usage instructions here
 3. Commit your changes (`git commit -am 'Added some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+
+## Author
+
+- YAMASHITA Yuu (https://github.com/yyuu)
+- Geisha Tokyo Entertainment Inc. (http://www.geishatokyo.com/)
+
+## License
+
+MIT

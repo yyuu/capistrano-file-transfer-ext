@@ -4,8 +4,8 @@ require File.expand_path('../lib/capistrano/configuration/actions/file_transfer_
 Gem::Specification.new do |gem|
   gem.authors       = ["Yamashita Yuu"]
   gem.email         = ["yamashita@geishatokyo.com"]
-  gem.description   = %q{TODO: Write a gem description}
-  gem.summary       = %q{TODO: Write a gem summary}
+  gem.description   = %q{A sort of utilities which helps you transferring files with Capistrano.}
+  gem.summary       = %q{A sort of utilities which helps you transferring files with Capistrano.}
   gem.homepage      = "https://github.com/yyuu/capistrano-file-transfer-ext"
 
   gem.files         = `git ls-files`.split($\)
