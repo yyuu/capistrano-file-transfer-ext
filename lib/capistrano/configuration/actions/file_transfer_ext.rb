@@ -22,6 +22,7 @@ module Capistrano
             run("rm -f #{tempfile.dump}", options)
             transfer(:up, from, tempfile, options, &block)
             execute = []
+            execute << "mkdir -p #{File.dirname(to).dump}"
             case compare_method
             when :diff
               execute << "( diff -u #{to.dump} #{tempfile.dump} || mv -f #{tempfile.dump} #{to.dump} )"
