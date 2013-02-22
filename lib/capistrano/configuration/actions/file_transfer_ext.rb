@@ -14,42 +14,26 @@ module Capistrano
           safe_upload(StringIO.new(data), path, opts)
         end
 
+        # upload file from local to remote.
+        # this method uses temporary file to avoid incomplete transmission of files.
         def safe_upload(from, to, options={}, &block)
-          mode = options.delete(:mode)
-          via = ( options.delete(:via) || :run )
-          compare_method = ( options.delete(:compare_method) || :cmp )
+          transfer_method = options.delete(:transfer) == :if_modified ? :transfer_if_modified : :transfer
+          place_method = options.delete(:place_method) == :if_modified ? :place_if_modified : :place
+          run_method = ( options.delete(:run_method) || :run )
           begin
             tempname = File.join("/tmp", File.basename(to) + ".XXXXXXXXXX")
             tempfile = capture("mktemp #{tempname.dump}").strip
             run("rm -f #{tempfile.dump}", options)
-            transfer(:up, from, tempfile, options, &block)
-            execute = []
-            execute << "mkdir -p #{File.dirname(to).dump}"
-            case compare_method
-            when :diff
-              execute << "( diff -u #{to.dump} #{tempfile.dump} || mv -f #{tempfile.dump} #{to.dump} )"
-            else
-              execute << "( cmp #{to.dump} #{tempfile.dump} || mv -f #{tempfile.dump} #{to.dump} )"
-            end
-            if mode
-              mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-              execute << "chmod #{mode} #{to}"
-            end
-            invoke_command(execute.join(" && "), options.merge(:via => via))
+            send(transfer_method, :up, from, tempfile, options, &block)
+            send(place_method, tempfile, to, options.merge(:via => run_method), &block)
           ensure
             run("rm -f #{tempfile.dump}", options) rescue nil
           end
         end
 
-        # transfer file (or IO like object) from local to remote.
-        # do not care if the transfer has been completed or not.
-        def _transfer(direction, from, to, options={}, &block)
-          transfer(direction, from, to, options, &block)
-        end
-
         # transfer file (or IO like object) from local to remote, only if the file checksum is differ.
         # do not care if the transfer has been completed or not.
-        def _transfer_if_modified(direction, from, to, options={}, &block)
+        def transfer_if_modified(direction, from, to, options={}, &block)
           digest_method = options.fetch(:digest_method, "md5")
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           require "digest/#{digest_method.downcase}"
@@ -82,9 +66,10 @@ module Capistrano
         end
 
         # place a file on remote.
-        def _place(from, to, options={}, &block)
+        def place(from, to, options={}, &block)
           mode = options.delete(:mode)
           execute = []
+          execute << "( test -d #{File.dirname(to).dump} || mkdir -p #{File.dirname(to).dump} )"
           execute << "mv -f #{from.dump} #{to.dump}"
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
@@ -94,11 +79,12 @@ module Capistrano
         end
 
         # place a file on remote, only if the destination is differ from source.
-        def _place_if_modified(from, to, options={}, &block)
+        def place_if_modified(from, to, options={}, &block)
           mode = options.delete(:mode)
           digest_method = options.fetch(:digest_method, "md5")
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           execute = []
+          execute << %{( test -d #{File.dirname(to).dump} || mkdir -p #{File.dirname(to).dump} )}
           execute << %{from=$(#{digest_cmd} #{from.dump} | #{DIGEST_FILTER_CMD})}
           execute << %{to=$(#{digest_cmd} #{to.dump} | #{DIGEST_FILTER_CMD})}
           execute << %{( test "x${from}" = "x${to}" || ( echo #{from.dump} '->' #{to.dump}; mv -f #{from.dump} #{to.dump} ) )}
