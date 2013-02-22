@@ -16,6 +16,12 @@ module Capistrano
 
         # upload file from local to remote.
         # this method uses temporary file to avoid incomplete transmission of files.
+        #
+        # The +options+ hash may include any of the following keys:
+        #
+        # * :transfer - use transfer_if_modified if :if_modified is set
+        # * :place - use place_if_modified if :if_modified is set
+        # * :run_method - the default is :run.
         def safe_upload(from, to, options={}, &block)
           transfer_method = options.delete(:transfer) == :if_modified ? :transfer_if_modified : :transfer
           place_method = options.delete(:place) == :if_modified ? :place_if_modified : :place
@@ -33,8 +39,14 @@ module Capistrano
 
         # transfer file (or IO like object) from local to remote, only if the file checksum is differ.
         # do not care if the transfer has been completed or not.
+        #
+        # The +options+ hash may include any of the following keys:
+        #
+        # * :digest - digest algorithm. the default is "md5".
+        # * :digest_cmd - the digest command. the default is "#{digest}sum".
+        #
         def transfer_if_modified(direction, from, to, options={}, &block)
-          digest_method = options.fetch(:digest_method, "md5")
+          digest_method = options.fetch(:digest, "md5")
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           require "digest/#{digest_method.downcase}"
           target = direction == :up ? from : to
@@ -66,6 +78,12 @@ module Capistrano
         end
 
         # place a file on remote.
+        #
+        # The +options+ hash may include any of the following keys:
+        #
+        # * :mode - permission of the file.
+        # * :sudo - use sudo if set true. the default is false.
+        #
         def place(from, to, options={}, &block)
           mode = options.delete(:mode)
           try_sudo = options.delete(:sudo) ? sudo : ""
@@ -80,10 +98,18 @@ module Capistrano
         end
 
         # place a file on remote, only if the destination is differ from source.
+        #
+        # The +options+ hash may include any of the following keys:
+        #
+        # * :mode - permission of the file.
+        # * :sudo - use sudo if set true. the default is false.
+        # * :digest - digest algorithm. the default is "md5".
+        # * :digest_cmd - the digest command. the default is "#{digest}sum".
+        #
         def place_if_modified(from, to, options={}, &block)
           mode = options.delete(:mode)
           try_sudo = options.delete(:sudo) ? sudo : ""
-          digest_method = options.fetch(:digest_method, "md5")
+          digest_method = options.fetch(:digest, "md5")
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           execute = []
           execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
