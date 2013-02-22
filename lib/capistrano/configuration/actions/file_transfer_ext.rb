@@ -18,7 +18,7 @@ module Capistrano
         # this method uses temporary file to avoid incomplete transmission of files.
         def safe_upload(from, to, options={}, &block)
           transfer_method = options.delete(:transfer) == :if_modified ? :transfer_if_modified : :transfer
-          place_method = options.delete(:place_method) == :if_modified ? :place_if_modified : :place
+          place_method = options.delete(:place) == :if_modified ? :place_if_modified : :place
           run_method = ( options.delete(:run_method) || :run )
           begin
             tempname = File.join("/tmp", File.basename(to) + ".XXXXXXXXXX")
