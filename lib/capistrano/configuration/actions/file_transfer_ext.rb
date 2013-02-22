@@ -68,12 +68,13 @@ module Capistrano
         # place a file on remote.
         def place(from, to, options={}, &block)
           mode = options.delete(:mode)
+          try_sudo = options.delete(:sudo) ? sudo : ""
           execute = []
-          execute << "( test -d #{File.dirname(to).dump} || mkdir -p #{File.dirname(to).dump} )"
-          execute << "mv -f #{from.dump} #{to.dump}"
+          execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
+          execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "chmod #{mode} #{to.dump}"
+            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
           end
           invoke_command(execute.join(" && "), options)
         end
@@ -81,16 +82,17 @@ module Capistrano
         # place a file on remote, only if the destination is differ from source.
         def place_if_modified(from, to, options={}, &block)
           mode = options.delete(:mode)
+          try_sudo = options.delete(:sudo) ? sudo : ""
           digest_method = options.fetch(:digest_method, "md5")
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           execute = []
-          execute << %{( test -d #{File.dirname(to).dump} || mkdir -p #{File.dirname(to).dump} )}
+          execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
           execute << %{from=$(#{digest_cmd} #{from.dump} | #{DIGEST_FILTER_CMD})}
           execute << %{to=$(#{digest_cmd} #{to.dump} | #{DIGEST_FILTER_CMD})}
-          execute << %{( test "x${from}" = "x${to}" || ( echo #{from.dump} '->' #{to.dump}; mv -f #{from.dump} #{to.dump} ) )}
+          execute << %{( test "x${from}" = "x${to}" || ( echo #{from.dump} '->' #{to.dump}; #{try_sudo} mv -f #{from.dump} #{to.dump} ) )}
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "chmod #{mode} #{to.dump}"
+            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
           end
           invoke_command(execute.join(" && "), options)
         end
