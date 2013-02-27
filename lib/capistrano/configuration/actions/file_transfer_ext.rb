@@ -7,7 +7,20 @@ module Capistrano
   class Configuration
     module Actions
       module FileTransferExt
-        DIGEST_FILTER_CMD = %{awk '{for(n=1;n<=NF;n++){if(match($n,"^[0-9a-z]{16,}$")){print($n);break}}}'}
+# FIXME: better way to filter out hexdigests from output of md5sum (both GNU and BSD).
+#        currently, we regards 16+ consecutive [0-9a-f] as string of hexdigest.
+#        since mawk does not recognize /.{n}/ style quantifier, the regex is very scary.
+        DIGEST_FILTER_CMD = "awk '%s'" % %q{
+{
+  for(n=1;n<=NF;n++){
+    if(match($n,
+"^[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]+$"
+       )){
+      print($n);break
+    }
+  }
+}
+                            }.gsub(/\s+/, "").strip
 
         def safe_put(data, path, options={})
           opts = options.dup
@@ -62,13 +75,15 @@ module Capistrano
               digest = nil
             end
           end
+          logger.debug("#{digest_method.upcase}(#{target.dump}) => #{digest}")
           if dry_run
             logger.debug("transfering: #{[direction, from, to] * ', '}")
           else
             execute_on_servers(options) do |servers|
               targets = servers.map { |server| sessions[server] }.reject { |session|
                 remote_digest = session.exec!("test -f #{remote_target.dump} && #{digest_cmd} #{remote_target.dump} | #{DIGEST_FILTER_CMD}")
-                result = !( digest.nil? or remote_digest.nil? ) && digest == remote_digest.strip
+                logger.debug("#{session.xserver.host}: #{digest_method.upcase}(#{remote_target.dump}) => #{remote_digest}")
+                result = !( digest.nil? or remote_digest.nil? ) && digest.strip == remote_digest.strip
                 logger.info("#{session.xserver.host}: skip transfering since no changes: #{[direction, from, to] * ', '}") if result
                 result
               }
