@@ -75,14 +75,14 @@ module Capistrano
               digest = nil
             end
           end
-          logger.debug("#{digest_method.upcase}(#{target}) => #{digest}")
+          logger.debug("#{digest_method.upcase}(#{target}) = #{digest}")
           if dry_run
             logger.debug("transfering: #{[direction, from, to] * ', '}")
           else
             execute_on_servers(options) do |servers|
               targets = servers.map { |server| sessions[server] }.reject { |session|
                 remote_digest = session.exec!("test -f #{remote_target.dump} && #{digest_cmd} #{remote_target.dump} | #{DIGEST_FILTER_CMD}")
-                logger.debug("#{session.xserver.host}: #{digest_method.upcase}(#{remote_target}) => #{remote_digest}")
+                logger.debug("#{session.xserver.host}: #{digest_method.upcase}(#{remote_target}) = #{remote_digest}")
                 result = !( digest.nil? or remote_digest.nil? ) && digest.strip == remote_digest.strip
                 logger.info("#{session.xserver.host}: skip transfering since no changes: #{[direction, from, to] * ', '}") if result
                 result
@@ -130,10 +130,10 @@ module Capistrano
           execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
           # calculate hexdigest of `from'
           execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) => ${from}".dump]
+          execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
           # calculate hexdigest of `to'
           execute << %{to=$(#{digest_cmd} #{to.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) => ${to}".dump]
+          execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) = ${to}".dump]
           # check the hexdigests
           execute << (<<-EOS).gsub(/\s+/, " ").strip
             if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
