@@ -24,8 +24,8 @@ Add `require` line in your `Capfile` or `config/deploy.rb` or so.
 
 Now you can use them in your tasks.
 
-* `safe_upload` - Transfers a file from the local host to multiple remote hosts, with comparing the difference of the contents. ([more...](#safe_upload))
-* `safe_put` - Store the contents of multiple servers, with comparing the difference of the contents. ([more...](#safe_put))
+* `safe_upload` - Transfers a file from the local host to multiple remote hosts. ([more...](#safe_upload))
+* `safe_put` - Store the contents of multiple servers. ([more...](#safe_put))
 
 ## Reference
 
@@ -43,7 +43,6 @@ The `safe_upload` acts like almost as same as `upload`, but with some little enh
 
 1. overwrite remote file only if transmission has been successfully completed.
 2. (if you request) overwrite remote file only if the checksums are different.
-3. (if you request) upload local file only if the checksums are different.
 
 #### Arguments
 
@@ -59,7 +58,6 @@ This must be a string indicating the path on the remote server that should be up
 
 All of the options of `upload` are sensible. In addition, there are some extra options.
 
-* `:transfer` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, upload the file only if checksums are different.
 * `:place` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, place the file only if the checksums are different.
 * `:digest` Thi is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.

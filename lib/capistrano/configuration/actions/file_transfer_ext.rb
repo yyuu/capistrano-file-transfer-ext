@@ -20,7 +20,7 @@ module Capistrano
     }
   }
 }
-                            }.gsub(/\s+/, "").strip
+        }.gsub(/\s+/, "").strip
 
         def safe_put(data, path, options={})
           opts = options.dup
