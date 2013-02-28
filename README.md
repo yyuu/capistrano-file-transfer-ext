@@ -27,6 +27,7 @@ Now you can use them in your tasks.
 * `safe_upload` - Transfers a file from the local host to multiple remote hosts, with comparing the difference of the contents. ([more...](#safe_upload))
 * `safe_put` - Store the contents of multiple servers, with comparing the difference of the contents. ([more...](#safe_put))
 
+## Reference
 
 ### `safe_upload`
 
