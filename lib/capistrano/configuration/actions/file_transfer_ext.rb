@@ -33,18 +33,23 @@ module Capistrano
         # The +options+ hash may include any of the following keys:
         #
         # * :transfer - use transfer_if_modified if :if_modified is set
-        # * :place - use place_if_modified if :if_modified is set
+        # * :install - use install_if_modified if :if_modified is set
         # * :run_method - the default is :run.
         def safe_upload(from, to, options={}, &block)
           transfer_method = options.delete(:transfer) == :if_modified ? :transfer_if_modified : :transfer
-          place_method = options.delete(:place) == :if_modified ? :place_if_modified : :place
+          if options.has_key?(:install)
+            install_method = options.delete(:install) == :if_modified ? :install_if_modified : :install
+          else
+            # for backward compatibility before v0.0.4.
+            install_method = options.delete(:place)   == :if_modified ? :install_if_modified : :install
+          end
           run_method = ( options.delete(:run_method) || :run )
           begin
             tempname = File.join("/tmp", File.basename(to) + ".XXXXXXXXXX")
             tempfile = capture("mktemp #{tempname.dump}").strip
             run("rm -f #{tempfile.dump}", options)
             send(transfer_method, :up, from, tempfile, options, &block)
-            send(place_method, tempfile, to, options.merge(:via => run_method), &block)
+            send(install_method, tempfile, to, options.merge(:via => run_method), &block)
           ensure
             run("rm -f #{tempfile.dump}", options) rescue nil
           end
@@ -92,14 +97,14 @@ module Capistrano
           end
         end
 
-        # place a file on remote.
+        # install a file on remote.
         #
         # The +options+ hash may include any of the following keys:
         #
         # * :mode - permission of the file.
         # * :sudo - use sudo if set true. the default is false.
         #
-        def place(from, to, options={}, &block)
+        def install(from, to, options={}, &block)
           mode = options.delete(:mode)
           try_sudo = options.delete(:sudo) ? sudo : ""
           execute = []
@@ -111,8 +116,9 @@ module Capistrano
           end
           invoke_command(execute.join(" && "), options)
         end
+        alias place install
 
-        # place a file on remote, only if the destination is differ from source.
+        # install a file on remote, only if the destination is differ from source.
         #
         # The +options+ hash may include any of the following keys:
         #
@@ -121,7 +127,7 @@ module Capistrano
         # * :digest - digest algorithm. the default is "md5".
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
-        def place_if_modified(from, to, options={}, &block)
+        def install_if_modified(from, to, options={}, &block)
           mode = options.delete(:mode)
           try_sudo = options.delete(:sudo) ? sudo : ""
           digest_method = options.fetch(:digest, "md5")
@@ -149,6 +155,7 @@ module Capistrano
           end
           invoke_command(execute.join(" && "), options)
         end
+        alias place_if_modified install_if_modified
       end
     end
   end

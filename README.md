@@ -58,7 +58,7 @@ This must be a string indicating the path on the remote server that should be up
 
 All of the options of `upload` are sensible. In addition, there are some extra options.
 
-* `:place` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, place the file only if the checksums are different.
+* `:install` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, install the file only if the checksums are different.
 * `:digest` Thi is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
 * `:sudo` It must be a boolean. If set true, use `sudo` on placing files. `false` by default.
