@@ -134,7 +134,7 @@ namespace(:test_default) {
     sudo("rm -rf tmp")
   }
 
-  task(:test_safe_upload1) {
+  task(:test_safe_upload) {
     body = "foo"
     from = "tmp/foo"
     to = "tmp/rfoo"
