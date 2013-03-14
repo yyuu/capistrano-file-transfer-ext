@@ -64,7 +64,7 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def transfer_if_modified(direction, from, to, options={}, &block)
-          digest_method = options.fetch(:digest, "md5")
+          digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           require "digest/#{digest_method.downcase}"
           target = direction == :up ? from : to
@@ -75,7 +75,7 @@ module Capistrano
             target.pos = pos
           else
             begin
-              digest = Digest::const_get(digest_method.upcase).hexdigest(File.read(target))
+              digest = Digest.const_get(digest_method.upcase).hexdigest(File.read(target))
             rescue SystemCallError
               digest = nil
             end
@@ -102,18 +102,63 @@ module Capistrano
         # The +options+ hash may include any of the following keys:
         #
         # * :mode - permission of the file.
-        # * :sudo - use sudo if set true. the default is false.
+        # * :via - :run by default.
         #
         def install(from, to, options={}, &block)
-          mode = options.delete(:mode)
-          try_sudo = options.delete(:sudo) ? sudo : ""
+          via = options.delete(:via)
+          if via == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
+            # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
+            try_sudo = sudo
+          else
+            try_sudo = ""
+            options[:via] = via
+          end
+          if options.key?(:mode)
+            mode = options.delete(:mode)
+          elsif fetch(:install_preserve_mode, true)
+            begin
+              # respect mode of original file
+              # `stat -c` for GNU, `stat -f` for BSD
+              s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
+              mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
+              logger.debug("preserve original file mode #{mode.to_s(8)}.")
+            rescue
+              # nop
+            end
+          end
+          if options.key?(:owner)
+            owner = options.delete(:owner)
+          elsif fetch(:install_preserve_owner, true) and via == :sudo
+            begin
+              owner = capture("test -f #{to.dump} && ( stat -c '%u' #{to.dump} || stat -f '%u' #{to.dump} )", options).strip
+              logger.debug("preserve original file owner #{owner.dump}.")
+            rescue
+              # nop
+            end
+          end
+          if options.key?(:group)
+            group = options.delete(:group)
+          elsif fetch(:install_preserve_group, true) and via == :sudo
+            begin
+              group = capture("test -f #{to.dump} && ( stat -c '%g' #{to.dump} || stat -f '%g' #{to.dump} )", options).strip
+              logger.debug("preserve original file grop #{group.dump}.")
+            rescue
+              # nop
+            end
+          end
           execute = []
-          execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
-          execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
+          if block_given?
+            execute << yield(from, to)
+          else
+            execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
+            execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
+          end
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
+            execute << "#{try_sudo} chmod #{mode.dump} #{to.dump}"
           end
+          execute << "#{try_sudo} chown #{owner.to_s.dump} #{to.dump}" if owner
+          execute << "#{try_sudo} chgrp #{group.to_s.dump} #{to.dump}" if group
           invoke_command(execute.join(" && "), options)
         end
         alias place install
@@ -123,37 +168,32 @@ module Capistrano
         # The +options+ hash may include any of the following keys:
         #
         # * :mode - permission of the file.
-        # * :sudo - use sudo if set true. the default is false.
+        # * :via - :run by default.
         # * :digest - digest algorithm. the default is "md5".
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def install_if_modified(from, to, options={}, &block)
-          mode = options.delete(:mode)
-          try_sudo = options.delete(:sudo) ? sudo : ""
-          digest_method = options.fetch(:digest, "md5")
+          digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
-          execute = []
-          execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
-          # calculate hexdigest of `from'
-          execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
-          # calculate hexdigest of `to'
-          execute << %{to=$(#{digest_cmd} #{to.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) = ${to}".dump]
-          # check the hexdigests
-          execute << (<<-EOS).gsub(/\s+/, " ").strip
-            if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
-              echo "skip placing since no changes.";
-            else
-              #{try_sudo} mv -f #{from.dump} #{to.dump};
-            fi
-          EOS
-
-          if mode
-            mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
+          install(from, to, options) do |from, to|
+            execute = []
+            execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
+            # calculate hexdigest of `from'
+            execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
+            execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
+            # calculate hexdigest of `to'
+            execute << %{to=$(#{digest_cmd} #{to.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
+            execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) = ${to}".dump]
+            # check the hexdigests
+            execute << (<<-EOS).gsub(/\s+/, " ").strip
+              if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
+                echo "skip installing since no changes.";
+              else
+                #{try_sudo} mv -f #{from.dump} #{to.dump};
+              fi
+            EOS
+            execute.join(" && ")
           end
-          invoke_command(execute.join(" && "), options)
         end
         alias place_if_modified install_if_modified
       end

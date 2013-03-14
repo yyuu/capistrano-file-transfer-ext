@@ -26,6 +26,9 @@ Now you can use them in your tasks.
 
 * `safe_upload` - Transfers a file from the local host to multiple remote hosts. ([more...](#safe_upload))
 * `safe_put` - Store the contents of multiple servers. ([more...](#safe_put))
+* `transfer_if_modified` - Transfer files from/to remote servers only if they are different. ([more...](#transfer_if_modified))
+* `install` - Install files on remote servers. ([more...](#install))
+* `install_if_modified` - Install files on remote servers only if they are different. ([more...](#install_if_modified))
 
 ## Reference
 
@@ -59,9 +62,9 @@ This must be a string indicating the path on the remote server that should be up
 All of the options of `upload` are sensible. In addition, there are some extra options.
 
 * `:install` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, install the file only if the checksums are different.
-* `:digest` Thi is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
+* `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
-* `:sudo` It must be a boolean. If set true, use `sudo` on placing files. `false` by default.
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
 
 
 ### `safe_put`
@@ -89,6 +92,104 @@ This is a string naming the file on the remote server(s) that should be created 
 **options**
 
 All of the options of `safe_upload` are sensible.
+
+
+### `transfer_if_modified`
+
+**Definition**
+
+    transfer_if_modified(direction, from, to, options={}, &block)
+
+**Module**
+
+    Capistrano::Configuration::Actions::FileTransferExt
+
+The `transfer_if_modified` action is `transfer`'s senior brother.
+Transfer files from/to remote servers only if they are different.
+
+#### Arguments
+
+**direction**
+
+The direction of transfer. `:up` or `:down` is sensible.
+
+**from**
+
+Source file.
+
+**to**
+
+Destination file.
+
+**options**
+
+All of the options of `transfer` are sensible. In addition, there are some extra options.
+
+* `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
+* `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
+
+
+### `install`
+
+**Definition**
+
+    install(from, to, options={}, &block)
+
+**Module**
+
+    Capistrano::Configuration::Actions::FileTransferExt
+
+Install files on remote servers. This method acts just like `mv`.
+
+#### Arguments
+
+**from**
+
+Source file on remote server.
+
+**to**
+
+Destination file on remote server.
+
+**options**
+
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
+* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
+* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+
+
+### `install_if_modified`
+
+**Definition**
+
+    install_if_modified(from, to, options={}, &block)
+
+**Module**
+
+    Capistrano::Configuration::Actions::FileTransferExt
+
+The `install_if_modified` action is `install`'s senior brother.
+Install files on remote servers only if they are different.
+
+#### Arguments
+
+**from**
+
+Source file on remote server.
+
+**to**
+
+Destination file on remote server.
+
+**options**
+
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
+* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
+* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
+* `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
 
 
 ## Contributing
