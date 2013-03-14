@@ -64,7 +64,7 @@ All of the options of `upload` are sensible. In addition, there are some extra o
 * `:install` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, install the file only if the checksums are different.
 * `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
-* `:via` `:run` by default.
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
 
 
 ### `safe_put`
@@ -153,7 +153,7 @@ Destination file on remote server.
 
 **options**
 
-* `:via` `:run` by default.
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
 * `:mode` The mode of destination file. If not given, preserve original mode of `to`.
 * `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
 * `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
@@ -184,7 +184,7 @@ Destination file on remote server.
 
 **options**
 
-* `:via` `:run` by default.
+* `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
 * `:mode` The mode of destination file. If not given, preserve original mode of `to`.
 * `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
 * `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
