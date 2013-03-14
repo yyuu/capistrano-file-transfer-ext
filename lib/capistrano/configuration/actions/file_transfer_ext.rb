@@ -105,7 +105,6 @@ module Capistrano
         # * :via - :run by default.
         #
         def install(from, to, options={}, &block)
-          mode = options.delete(:mode)
           if options[:via] == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
             # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
             options.delete(:via)
@@ -113,10 +112,25 @@ module Capistrano
           else
             try_sudo = ""
           end
+          if options.key?(:mode)
+            mode = options.delete(:mode)
+#         else
+#           begin
+#             # respect mode of original file
+#             # `stat -c` for GNU, `stat -f` for BSD
+#             s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
+#             mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
+#           rescue
+#             # nop
+#           end
+          end
           execute = []
-          execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
-          execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
-
+          if block_given?
+            execute << yield(from, to)
+          else
+            execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
+            execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
+          end
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
             execute << "#{try_sudo} chmod #{mode} #{to.dump}"
@@ -135,37 +149,27 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def install_if_modified(from, to, options={}, &block)
-          mode = options.delete(:mode)
-          if options[:via] == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
-            options.delete(:via)
-            try_sudo = sudo
-          else
-            try_sudo = ""
-          end
           digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
-          execute = []
-          execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
-          # calculate hexdigest of `from'
-          execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
-          # calculate hexdigest of `to'
-          execute << %{to=$(#{digest_cmd} #{to.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
-          execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) = ${to}".dump]
-          # check the hexdigests
-          execute << (<<-EOS).gsub(/\s+/, " ").strip
-            if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
-              echo "skip installing since no changes.";
-            else
-              #{try_sudo} mv -f #{from.dump} #{to.dump};
-            fi
-          EOS
-
-          if mode
-            mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
+          install(from, to, options) do |from, to|
+            execute = []
+            execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
+            # calculate hexdigest of `from'
+            execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
+            execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
+            # calculate hexdigest of `to'
+            execute << %{to=$(#{digest_cmd} #{to.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
+            execute << %{echo %s} % ["#{digest_method.upcase}(#{to}) = ${to}".dump]
+            # check the hexdigests
+            execute << (<<-EOS).gsub(/\s+/, " ").strip
+              if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
+                echo "skip installing since no changes.";
+              else
+                #{try_sudo} mv -f #{from.dump} #{to.dump};
+              fi
+            EOS
+            execute.join(" && ")
           end
-          invoke_command(execute.join(" && "), options)
         end
         alias place_if_modified install_if_modified
       end
