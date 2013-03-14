@@ -75,7 +75,7 @@ module Capistrano
             target.pos = pos
           else
             begin
-              digest = Digest::const_get(digest_method.upcase).hexdigest(File.read(target))
+              digest = Digest.const_get(digest_method.upcase).hexdigest(File.read(target))
             rescue SystemCallError
               digest = nil
             end
