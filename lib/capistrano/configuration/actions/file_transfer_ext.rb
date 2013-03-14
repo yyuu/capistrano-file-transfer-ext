@@ -114,15 +114,18 @@ module Capistrano
           end
           if options.key?(:mode)
             mode = options.delete(:mode)
-#         else
-#           begin
-#             # respect mode of original file
-#             # `stat -c` for GNU, `stat -f` for BSD
-#             s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
-#             mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
-#           rescue
-#             # nop
-#           end
+          else
+            if fetch(:install_preserve_mode, true)
+              begin
+                # respect mode of original file
+                # `stat -c` for GNU, `stat -f` for BSD
+                s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
+                mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
+                logger.debug("preserve original file mode #{mode.to_s(8)}.")
+              rescue
+                # nop
+              end
+            end
           end
           execute = []
           if block_given?

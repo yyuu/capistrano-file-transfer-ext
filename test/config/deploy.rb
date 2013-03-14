@@ -76,14 +76,16 @@ end
 
 def assert_file_mode(mode, file, options={})
   mode = mode.to_i(8) if mode.is_a?(String)
-  args = []
-  args << "-x #{file.dump}" if (mode & 0100) != 0
-  args << "-w #{file.dump}" if (mode & 0200) != 0
-  args << "-r #{file.dump}" if (mode & 0400) != 0
+  smode = "%c%c%c%c%c%c%c%c%c%c" % [
+    ?-,
+    mode & 0400 == 0 ? ?- : ?r, mode & 0200 == 0 ? ?- : ?w, mode & 0100 == 0 ? ?- : ?x,
+    mode & 0040 == 0 ? ?- : ?r, mode & 0020 == 0 ? ?- : ?w, mode & 0010 == 0 ? ?- : ?x,
+    mode & 0004 == 0 ? ?- : ?r, mode & 0002 == 0 ? ?- : ?w, mode & 0001 == 0 ? ?- : ?x,
+  ]
   begin
-    _invoke_command("test #{args.join(" -a ")}", options)
+    _invoke_command("test #{smode.dump} = $(ls -l #{file.dump} | cut -d ' ' -f 1)", options)
   rescue
-    logger.debug("assert_file_mode(#{mode}, #{file}) failed.")
+    logger.debug("assert_file_mode(#{mode.to_s(8)}, #{file}) failed.")
     _invoke_command("ls -l #{file.dump}", options)
     raise
   end
@@ -251,9 +253,10 @@ def _test_install(frombody, tobody, options={})
   to = capture("mktemp tmp/to.XXXXXXXXXX").strip
   run("rm -f #{to.dump}")
   put(tobody, to) if tobody
+  orig_mode = options.delete(:orig_mode)
+  run("chmod #{orig_mode.to_s(8)} #{to.dump}") if orig_mode
   if tobody and options[:via] == :sudo
     sudo("chown root #{to.dump}")
-    sudo("chmod 644 #{to.dump}")
   end
 
   tempfrom = capture("mktemp tmp/from2.XXXXXXXXXX").strip
@@ -334,6 +337,18 @@ namespace(:test_install) {
 #     assert_file_owner(0, to)
     end
   }
+
+  task(:test_preserve_original_mode) {
+    _test_install("foo", "bar", :orig_mode => 0600) do |from, to, tempfrom, tempto|
+      assert_file_mode(0600, to)
+    end
+  }
+
+  task(:test_ignore_original_mode) {
+    _test_install("foo", "bar", :orig_mode => 0400, :mode => 0700) do |from, to, tempfrom, tempto|
+      assert_file_mode(0700, to)
+    end
+  }
 }
 
 namespace(:test_install_if_modified) {
@@ -398,6 +413,18 @@ namespace(:test_install_if_modified) {
     _test_install("bar", "baz", :method => :install_if_modified, :mode => 0644, :via => :sudo) do |from, to, tempfrom, tempto|
       assert_file_mode(0644, to)
 #     assert_file_owner(0, to)
+    end
+  }
+
+  task(:test_preserve_original_mode) {
+    _test_install("foo", "bar", :orig_mode => 0600) do |from, to, tempfrom, tempto|
+      assert_file_mode(0600, to)
+    end
+  }
+
+  task(:test_ignore_original_mode) {
+    _test_install("foo", "bar", :orig_mode => 0400, :mode => 0700) do |from, to, tempfrom, tempto|
+      assert_file_mode(0700, to)
     end
   }
 }
