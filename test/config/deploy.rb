@@ -103,6 +103,18 @@ def assert_file_owner(uid, file, options={})
   end
 end
 
+def assert_file_group(gid, file, options={})
+  gid = gid.to_i
+  # `stat -c` => GNU, `stat -f` => BSD
+  begin
+    _invoke_command("test #{gid} -eq $( stat -c '%g' #{file.dump} || stat -f '%g' #{file.dump} )", options)
+  rescue
+    logger.debug("assert_file_group(#{gid}, #{file}) failed.")
+    _invoke_command("ls -l #{file.dump}", options)
+    raise
+  end
+end
+
 namespace(:test_default) {
   task(:default) {
     methods.grep(/^test_/).each do |m|
@@ -113,13 +125,13 @@ namespace(:test_default) {
   after "test_default", "test_default:teardown"
 
   task(:setup) {
-    run_locally("rm -rf tmp; mkdir -p tmp")
-    run("rm -rf tmp; mkdir -p tmp")
+    run_locally("mkdir -p tmp")
+    run("mkdir -p tmp")
   }
 
   task(:teardown) {
     run_locally("rm -rf tmp")
-    run("rm -rf tmp")
+    sudo("rm -rf tmp")
   }
 
   task(:test_safe_upload1) {
@@ -153,13 +165,13 @@ namespace(:test_transfer_if_modified) {
   after "test_transfer_if_modified", "test_transfer_if_modified:teardown"
 
   task(:setup) {
-    run_locally("rm -rf tmp; mkdir -p tmp")
-    run("rm -rf tmp; mkdir -p tmp")
+    run_locally("mkdir -p tmp")
+    run("mkdir -p tmp")
   }
 
   task(:teardown) {
     run_locally("rm -rf tmp")
-    run("rm -rf tmp")
+    sudo("rm -rf tmp")
   }
 
   def _test_transfer_if_modified_up(from, to, options={})
@@ -252,24 +264,28 @@ def _test_install(frombody, tobody, options={})
   sleep(1)
   to = capture("mktemp tmp/to.XXXXXXXXXX").strip
   run("rm -f #{to.dump}")
-  put(tobody, to) if tobody
-  orig_mode = options.delete(:orig_mode)
-  run("chmod #{orig_mode.to_s(8)} #{to.dump}") if orig_mode
-  if tobody and options[:via] == :sudo
-    sudo("chown root #{to.dump}")
+  if tobody
+    put(tobody, to)
+    orig_mode = options.delete(:orig_mode)
+    run("chmod #{orig_mode.to_s(8)} #{to.dump}") if orig_mode
+    orig_owner = options.delete(:orig_owner)
+    sudo("chown #{orig_owner} #{to.dump}") if orig_owner
+    orig_group = options.delete(:orig_group)
+    sudo("chgrp #{orig_group} #{to.dump}") if orig_group
   end
 
   tempfrom = capture("mktemp tmp/from2.XXXXXXXXXX").strip
-  run("rm -f #{tempfrom.dump}; cp -p #{from.dump} #{tempfrom.dump}")
+  run("rm -f #{tempfrom.dump}; #{sudo} cp -p #{from.dump} #{tempfrom.dump}")
 
   tempto = capture("mktemp tmp/to2.XXXXXXXXXX").strip
   if tobody
-    run("rm -f #{tempto.dump}; cp -p #{to.dump} #{tempto.dump}")
+    run("rm -f #{tempto.dump}; #{sudo} cp -p #{to.dump} #{tempto.dump}")
   else
     run("rm -f #{tempto.dump}")
   end
 
-  send(options.fetch(:method, :install), from, to, options)
+  method = ( options.delete(:install) || :always )
+  send(method == :if_modified ? :install_if_modified : :install, from, to, options)
   yield(from, to, tempfrom, tempto)
 end
 
@@ -283,17 +299,17 @@ namespace(:test_install) {
   after "test_install", "test_install:teardown"
 
   task(:setup) {
-    run_locally("rm -rf tmp; mkdir -p tmp")
-    run("rm -rf tmp; mkdir -p tmp")
+    run_locally("mkdir -p tmp")
+    run("mkdir -p tmp")
   }
 
   task(:teardown) {
     run_locally("rm -rf tmp")
-    run("rm -rf tmp")
+    sudo("rm -rf tmp")
   }
 
   task(:test_if_not_modified) {
-    _test_install("foo", "foo", :method => :install) do |from, to, tempfrom, tempto|
+    _test_install("foo", "foo") do |from, to, tempfrom, tempto|
       assert_file_equals(tempto, to)
       assert_timestamp_equals(tempfrom, to)
       assert_timestamp_not_equals(tempto, to)
@@ -302,7 +318,7 @@ namespace(:test_install) {
   }
 
   task(:test_if_modified) {
-    _test_install("foo", "bar", :method => :install, :digest => :sha1) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :digest => :sha1) do |from, to, tempfrom, tempto|
       assert_file_equals(tempfrom, to)
       assert_timestamp_equals(tempfrom, to)
       assert_timestamp_not_equals(tempto, to)
@@ -311,30 +327,28 @@ namespace(:test_install) {
   }
 
   task(:test_if_missing) {
-    _test_install("baz", nil, :method => :install) do |from, to, tempfrom, tempto|
+    _test_install("baz", nil) do |from, to, tempfrom, tempto|
       assert_file_equals(tempfrom, to)
       assert_timestamp_equals(tempfrom, to)
-#     assert_timestamp_not_equals(tempto, to)
-#     assert_file_mode_equals(tempto, to)
     end
   }
 
   task(:test_with_mode) {
-    _test_install("foo", "bar", :method => :install, :mode => 0755) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :mode => 0755) do |from, to, tempfrom, tempto|
       assert_file_mode(0755, to)
     end
   }
 
   task(:test_via_sudo) {
-    _test_install("bar", "baz", :method => :install, :via => :sudo) do |from, to, tempfrom, tempto|
-#     assert_file_owner(0, to)
+    _test_install("bar", "baz", :orig_owner => 0, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_owner(0, to)
     end
   }
 
   task(:test_with_mode_via_sudo) {
-    _test_install("bar", "baz", :mode => 0644, :via => :sudo) do |from, to, tempfrom, tempto|
+    _test_install("bar", "baz", :mode => 0644, :orig_owner => 0, :via => :sudo) do |from, to, tempfrom, tempto|
       assert_file_mode(0644, to)
-#     assert_file_owner(0, to)
+      assert_file_owner(0, to)
     end
   }
 
@@ -347,6 +361,22 @@ namespace(:test_install) {
   task(:test_ignore_original_mode) {
     _test_install("foo", "bar", :orig_mode => 0400, :mode => 0700) do |from, to, tempfrom, tempto|
       assert_file_mode(0700, to)
+    end
+  }
+
+  task(:test_preserve_original_owner_group_mode) {
+    _test_install("foo", "bar", :orig_owner => 0, :orig_group => 0, :orig_mode => 0640, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_mode(0640, to)
+      assert_file_owner(0, to)
+      assert_file_group(0, to)
+    end
+  }
+
+  task(:test_ignore_original_owner_group_mode) {
+    _test_install("bar", "baz", :owner => 0, :group => 0, :mode => 0640, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_mode(0640, to)
+      assert_file_owner(0, to)
+      assert_file_group(0, to)
     end
   }
 }
@@ -361,17 +391,17 @@ namespace(:test_install_if_modified) {
   after "test_install_if_modified", "test_install_if_modified:teardown"
 
   task(:setup) {
-    run_locally("rm -rf tmp; mkdir -p tmp")
-    run("rm -rf tmp; mkdir -p tmp")
+    run_locally("mkdir -p tmp")
+    run("mkdir -p tmp")
   }
 
   task(:teardown) {
     run_locally("rm -rf tmp")
-    run("rm -rf tmp")
+    sudo("rm -rf tmp")
   }
 
   task(:test_if_not_modified) {
-    _test_install("foo", "foo", :method => :install_if_modified) do |from, to, tempfrom, tempto|
+    _test_install("foo", "foo", :install => :if_modified) do |from, to, tempfrom, tempto|
       assert_file_equals(tempto, to)
       assert_timestamp_equals(tempto, to)
       assert_timestamp_not_equals(tempfrom, to)
@@ -380,7 +410,7 @@ namespace(:test_install_if_modified) {
   }
 
   task(:test_if_modified) {
-    _test_install("foo", "bar", :method => :install_if_modified, :digest => :sha1) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :install => :if_modified, :digest => :sha1) do |from, to, tempfrom, tempto|
       assert_file_equals(tempfrom, to)
       assert_timestamp_equals(tempfrom, to)
       assert_timestamp_not_equals(tempto, to)
@@ -389,42 +419,56 @@ namespace(:test_install_if_modified) {
   }
 
   task(:test_if_missing) {
-    _test_install("baz", nil, :method => :install_if_modified) do |from, to, tempfrom, tempto|
+    _test_install("baz", nil, :install => :if_modified) do |from, to, tempfrom, tempto|
       assert_file_equals(tempfrom, to)
       assert_timestamp_equals(tempfrom, to)
-#     assert_timestamp_not_equals(tempto, to)
-#     assert_file_mode_equals(tempto, to)
     end
   }
 
   task(:test_with_mode) {
-    _test_install("foo", "bar", :method => :install_if_modified, :mode => 0755) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :install => :if_modified, :mode => 0755) do |from, to, tempfrom, tempto|
       assert_file_mode(0755, to)
     end
   }
 
   task(:test_via_sudo) {
-    _test_install("bar", "baz", :method => :install_if_modified, :via => :sudo) do |from, to, tempfrom, tempto|
-#     assert_file_owner(0, to)
+    _test_install("bar", "baz", :install => :if_modified, :orig_owner => 0, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_owner(0, to)
     end
   }
 
   task(:test_with_mode_via_sudo) {
-    _test_install("bar", "baz", :method => :install_if_modified, :mode => 0644, :via => :sudo) do |from, to, tempfrom, tempto|
+    _test_install("bar", "baz", :install => :if_modified, :orig_owner => 0, :mode => 0644, :via => :sudo) do |from, to, tempfrom, tempto|
       assert_file_mode(0644, to)
-#     assert_file_owner(0, to)
+      assert_file_owner(0, to)
     end
   }
 
   task(:test_preserve_original_mode) {
-    _test_install("foo", "bar", :orig_mode => 0600) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :install => :if_modified, :orig_mode => 0600) do |from, to, tempfrom, tempto|
       assert_file_mode(0600, to)
     end
   }
 
   task(:test_ignore_original_mode) {
-    _test_install("foo", "bar", :orig_mode => 0400, :mode => 0700) do |from, to, tempfrom, tempto|
+    _test_install("foo", "bar", :install => :if_modified, :orig_mode => 0400, :mode => 0700) do |from, to, tempfrom, tempto|
       assert_file_mode(0700, to)
+    end
+  }
+
+  task(:test_preserve_original_owner_group_mode) {
+    _test_install("foo", "bar", :install => :if_modified, :orig_owner => 0, :orig_group => 0, :orig_mode => 0640, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_mode(0640, to)
+      assert_file_owner(0, to)
+      assert_file_group(0, to)
+    end
+  }
+
+  task(:test_ignore_original_owner_group_mode) {
+    _test_install("bar", "baz", :install => :if_modified, :owner => 0, :group => 0, :mode => 0640, :via => :sudo) do |from, to, tempfrom, tempto|
+      assert_file_mode(0640, to)
+      assert_file_owner(0, to)
+      assert_file_group(0, to)
     end
   }
 }

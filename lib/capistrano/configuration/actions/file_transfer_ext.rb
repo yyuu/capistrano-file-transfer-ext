@@ -105,26 +105,45 @@ module Capistrano
         # * :via - :run by default.
         #
         def install(from, to, options={}, &block)
-          if options[:via] == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
+          via = options.delete(:via)
+          if via == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
             # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
-            options.delete(:via)
             try_sudo = sudo
           else
             try_sudo = ""
+            options[:via] = via
           end
           if options.key?(:mode)
             mode = options.delete(:mode)
-          else
-            if fetch(:install_preserve_mode, true)
-              begin
-                # respect mode of original file
-                # `stat -c` for GNU, `stat -f` for BSD
-                s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
-                mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
-                logger.debug("preserve original file mode #{mode.to_s(8)}.")
-              rescue
-                # nop
-              end
+          elsif fetch(:install_preserve_mode, true)
+            begin
+              # respect mode of original file
+              # `stat -c` for GNU, `stat -f` for BSD
+              s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
+              mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
+              logger.debug("preserve original file mode #{mode.to_s(8)}.")
+            rescue
+              # nop
+            end
+          end
+          if options.key?(:owner)
+            owner = options.delete(:owner)
+          elsif fetch(:install_preserve_owner, true) and via == :sudo
+            begin
+              owner = capture("test -f #{to.dump} && ( stat -c '%u' #{to.dump} || stat -f '%u' #{to.dump} )", options).strip
+              logger.debug("preserve original file owner #{owner.dump}.")
+            rescue
+              # nop
+            end
+          end
+          if options.key?(:group)
+            group = options.delete(:group)
+          elsif fetch(:install_preserve_group, true) and via == :sudo
+            begin
+              group = capture("test -f #{to.dump} && ( stat -c '%g' #{to.dump} || stat -f '%g' #{to.dump} )", options).strip
+              logger.debug("preserve original file grop #{group.dump}.")
+            rescue
+              # nop
             end
           end
           execute = []
@@ -136,8 +155,10 @@ module Capistrano
           end
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "#{try_sudo} chmod #{mode} #{to.dump}"
+            execute << "#{try_sudo} chmod #{mode.dump} #{to.dump}"
           end
+          execute << "#{try_sudo} chown #{owner.to_s.dump} #{to.dump}" if owner
+          execute << "#{try_sudo} chgrp #{group.to_s.dump} #{to.dump}" if group
           invoke_command(execute.join(" && "), options)
         end
         alias place install

@@ -153,8 +153,10 @@ Destination file on remote server.
 
 **options**
 
-* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
 * `:via` `:run` by default.
+* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
+* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
 
 
 ### `install_if_modified`
@@ -182,8 +184,10 @@ Destination file on remote server.
 
 **options**
 
-* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
 * `:via` `:run` by default.
+* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
+* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
 * `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
 
