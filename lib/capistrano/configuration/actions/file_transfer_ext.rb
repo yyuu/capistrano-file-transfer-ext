@@ -64,7 +64,7 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def transfer_if_modified(direction, from, to, options={}, &block)
-          digest_method = options.fetch(:digest, "md5")
+          digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           require "digest/#{digest_method.downcase}"
           target = direction == :up ? from : to
@@ -102,14 +102,21 @@ module Capistrano
         # The +options+ hash may include any of the following keys:
         #
         # * :mode - permission of the file.
-        # * :sudo - use sudo if set true. the default is false.
+        # * :via - :run by default.
         #
         def install(from, to, options={}, &block)
           mode = options.delete(:mode)
-          try_sudo = options.delete(:sudo) ? sudo : ""
+          if options[:via] == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
+            # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
+            options.delete(:via)
+            try_sudo = sudo
+          else
+            try_sudo = ""
+          end
           execute = []
           execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
           execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
+
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
             execute << "#{try_sudo} chmod #{mode} #{to.dump}"
@@ -123,14 +130,19 @@ module Capistrano
         # The +options+ hash may include any of the following keys:
         #
         # * :mode - permission of the file.
-        # * :sudo - use sudo if set true. the default is false.
+        # * :via - :run by default.
         # * :digest - digest algorithm. the default is "md5".
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def install_if_modified(from, to, options={}, &block)
           mode = options.delete(:mode)
-          try_sudo = options.delete(:sudo) ? sudo : ""
-          digest_method = options.fetch(:digest, "md5")
+          if options[:via] == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
+            options.delete(:via)
+            try_sudo = sudo
+          else
+            try_sudo = ""
+          end
+          digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           execute = []
           execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
@@ -143,7 +155,7 @@ module Capistrano
           # check the hexdigests
           execute << (<<-EOS).gsub(/\s+/, " ").strip
             if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
-              echo "skip placing since no changes.";
+              echo "skip installing since no changes.";
             else
               #{try_sudo} mv -f #{from.dump} #{to.dump};
             fi

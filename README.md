@@ -64,7 +64,7 @@ All of the options of `upload` are sensible. In addition, there are some extra o
 * `:install` It must be either `:always` (the default), or `:if_modified`. If `:if_modified` is given, install the file only if the checksums are different.
 * `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
-* `:sudo` It must be a boolean. If set true, use `sudo` on placing files. `false` by default.
+* `:via` `:run` by default.
 
 
 ### `safe_put`
@@ -154,7 +154,7 @@ Destination file on remote server.
 **options**
 
 * `:mode` The mode of destination file.
-* `:sudo` It must be a boolean. If set true, use `sudo` on placing files. `false` by default.
+* `:via` `:run` by default.
 
 
 ### `install_if_modified`
@@ -183,7 +183,7 @@ Destination file on remote server.
 **options**
 
 * `:mode` The mode of destination file.
-* `:sudo` It must be a boolean. If set true, use `sudo` on placing files. `false` by default.
+* `:via` `:run` by default.
 * `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
 
