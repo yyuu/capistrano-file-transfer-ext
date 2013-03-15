@@ -115,11 +115,11 @@ The direction of transfer. `:up` or `:down` is sensible.
 
 **from**
 
-Source file.
+Thie may be either a String, or an IO object (e.g. an open file handle, or a StringIO instance).
 
 **to**
 
-Destination file.
+This must be a string indicating the path on the remote server that should be uploaded to.
 
 **options**
 
@@ -139,17 +139,17 @@ All of the options of `transfer` are sensible. In addition, there are some extra
 
     Capistrano::Configuration::Actions::FileTransferExt
 
-Install files on remote servers. This method acts just like `mv`.
+Install files on remote servers. This method acts like `mv`, but with little enhancements.
 
 #### Arguments
 
 **from**
 
-Source file on remote server.
+This must be a string indicating the path on the remote server that should be installed from.
 
 **to**
 
-Destination file on remote server.
+This must be a string indicating the path on the remote server that should be installed to.
 
 **options**
 
@@ -176,11 +176,11 @@ Install files on remote servers only if they are different.
 
 **from**
 
-Source file on remote server.
+This must be a string indicating the path on the remote server that should be installed from.
 
 **to**
 
-Destination file on remote server.
+This must be a string indicating the path on the remote server that should be installed to.
 
 **options**
 
