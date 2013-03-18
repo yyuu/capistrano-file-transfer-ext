@@ -114,39 +114,53 @@ module Capistrano
             try_sudo = sudo
           else
             try_sudo = ""
-            options[:via] = via
+            options[:via] = via if via
           end
-          if options.key?(:mode)
-            mode = options.delete(:mode)
-          elsif fetch(:install_preserve_mode, true)
-            begin
-              # respect mode of original file
-              # `stat -c` for GNU, `stat -f` for BSD
-              s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
-              mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
-              logger.debug("preserve original file mode #{mode.to_s(8)}.")
-            rescue
-              # nop
+          # * If :mode is :preserve or :mode is not given, preserve original mode.
+          # * Otherwise, just respect given :mode.
+          mode_given = options.key?(:mode)
+          mode = options.delete(:mode)
+          if mode_given ? mode == :preserve : true
+            if fetch(:install_preserve_mode, true)
+              begin
+                # respect mode of original file
+                # `stat -c` for GNU, `stat -f` for BSD
+                s = capture("test -f #{to.dump} && ( stat -c '%a' #{to.dump} || stat -f '%p' #{to.dump} )", options)
+                mode = s.to_i(8) & 0777 if /^[0-7]+$/ =~ s
+                logger.debug("preserve original file mode #{mode.to_s(8)}.")
+              rescue
+                mode = nil
+              end
+            else
+              mode = nil
             end
           end
-          if options.key?(:owner)
-            owner = options.delete(:owner)
-          elsif fetch(:install_preserve_owner, true) and via == :sudo
-            begin
-              owner = capture("test -f #{to.dump} && ( stat -c '%u' #{to.dump} || stat -f '%u' #{to.dump} )", options).strip
-              logger.debug("preserve original file owner #{owner.dump}.")
-            rescue
-              # nop
+          owner_given = options.key?(:owner)
+          owner = options.delete(:owner)
+          if owner_given ? owner == :preserve : true
+            if fetch(:install_preserve_owner, true) and via == :sudo
+              begin
+                owner = capture("test -f #{to.dump} && ( stat -c '%u' #{to.dump} || stat -f '%u' #{to.dump} )", options).strip
+                logger.debug("preserve original file owner #{owner.dump}.")
+              rescue
+                owner = nil
+              end
+            else
+              owner = nil
             end
           end
-          if options.key?(:group)
-            group = options.delete(:group)
-          elsif fetch(:install_preserve_group, true) and via == :sudo
-            begin
-              group = capture("test -f #{to.dump} && ( stat -c '%g' #{to.dump} || stat -f '%g' #{to.dump} )", options).strip
-              logger.debug("preserve original file grop #{group.dump}.")
-            rescue
-              # nop
+          group_given = options.key?(:group)
+          group = options.delete(:group)
+          if group_given ? group == :preserve : true
+            if fetch(:install_preserve_group, true) and via == :sudo
+              begin
+                group = capture("test -f #{to.dump} && ( stat -c '%g' #{to.dump} || stat -f '%g' #{to.dump} )", options).strip
+                logger.debug("preserve original file grop #{group.dump}.")
+              rescue
+                group = nil
+              end
+            else
+              group = nil
             end
           end
           execute = []

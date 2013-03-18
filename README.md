@@ -154,9 +154,9 @@ This must be a string indicating the path on the remote server that should be in
 **options**
 
 * `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
-* `:mode` The mode of destination file. If not given, preserve original mode of `to`.
-* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
-* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:mode` The mode of destination file. If `:preserve` is given, preserve original mode of `to`.
+* `:owner` The owner of destination file. If `:preserve` is given and `:via` is `:sudo`, preserve original owner of `to`.
+* `:group` The group of destination file. If `:preserve` is given and `:via` is `:sudo`, preserve original group of `to`.
 
 
 ### `install_if_modified`
@@ -186,8 +186,8 @@ This must be a string indicating the path on the remote server that should be in
 
 * `:via` specify the method to run commands. `:run` by default. you may need to set this value as `:sudo` if you want to overwrite system files.
 * `:mode` The mode of destination file. If not given, preserve original mode of `to`.
-* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
-* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original mode of `to`.
+* `:owner` The owner of destination file. If not given and `:via` is `:sudo`, preserve original owner of `to`.
+* `:group` The group of destination file. If not given and `:via` is `:sudo`, preserve original group of `to`.
 * `:digest` This is a symbol indicating which algorithm should be used to calculate the checksum of files. `:md5` is default.
 * `:digest_cmd` The command to calculate checksum of files. `md5sum` is default.
 
