@@ -36,6 +36,7 @@ module Capistrano
         # * :install - use install_if_modified if :if_modified is set
         # * :run_method - the default is :run.
         def safe_upload(from, to, options={}, &block)
+          options = options.dup
           transfer_method = options.delete(:transfer) == :if_modified ? :transfer_if_modified : :transfer
           if options.has_key?(:install)
             install_method = options.delete(:install) == :if_modified ? :install_if_modified : :install
@@ -64,6 +65,7 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def transfer_if_modified(direction, from, to, options={}, &block)
+          options = options.dup
           digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           require "digest/#{digest_method.downcase}"
@@ -105,6 +107,7 @@ module Capistrano
         # * :via - :run by default.
         #
         def install(from, to, options={}, &block)
+          options = options.dup
           via = options.delete(:via)
           if via == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
             # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
@@ -173,6 +176,7 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def install_if_modified(from, to, options={}, &block)
+          options = options.dup
           digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           install(from, to, options) do |from, to|
