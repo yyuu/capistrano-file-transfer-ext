@@ -1,6 +1,8 @@
 require "capistrano/configuration/actions/file_transfer_ext/version"
 require "capistrano/configuration"
 require "capistrano/transfer"
+require "find"
+require "pathname"
 require "stringio"
 
 module Capistrano
@@ -65,36 +67,47 @@ module Capistrano
         # * :digest_cmd - the digest command. the default is "#{digest}sum".
         #
         def transfer_if_modified(direction, from, to, options={}, &block)
-          options = options.dup
-          digest_method = options.fetch(:digest, :md5).to_s
-          digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
-          require "digest/#{digest_method.downcase}"
-          target = direction == :up ? from : to
+          safe_options = options.dup
+          digest_method = safe_options.fetch(:digest, :md5).to_s
+          digest_cmd = safe_options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
+          target        = direction == :up ? from : to
           remote_target = direction == :up ? to : from
-          if target.respond_to?(:read)
-            pos = target.pos
-            digest = Digest.const_get(digest_method.upcase).hexdigest(target.read)
-            target.pos = pos
-          else
-            begin
-              digest = Digest.const_get(digest_method.upcase).hexdigest(File.read(target))
-            rescue SystemCallError
-              digest = nil
+          require "digest/#{digest_method.downcase}"
+          target_is_io = target.respond_to?(:read)
+          if not(target_is_io) and FileTest.directory?(target)
+            Find.find(target) do |_target|
+              relative_path = Pathname.new(_target).relative_path_from(Pathname.new(target))
+              _remote_target = File.join(remote_target, relative_path)
+              from = direction == :up ? _target : _remote_target
+              to   = direction == :up ? _remote_target : _target
+              transfer_if_modified(direction, from, to, options, &block) unless FileTest.directory?(_target)
             end
-          end
-          logger.debug("#{digest_method.upcase}(#{target}) = #{digest}")
-          if dry_run
-            logger.debug("transfering: #{[direction, from, to] * ', '}")
           else
-            execute_on_servers(options) do |servers|
-              targets = servers.map { |server| sessions[server] }.reject { |session|
-                remote_digest = session.exec!("test -f #{remote_target.dump} && #{digest_cmd} #{remote_target.dump} | #{DIGEST_FILTER_CMD}")
-                logger.debug("#{session.xserver.host}: #{digest_method.upcase}(#{remote_target}) = #{remote_digest}")
-                result = !( digest.nil? or remote_digest.nil? ) && digest.strip == remote_digest.strip
-                logger.info("#{session.xserver.host}: skip transfering since no changes: #{[direction, from, to] * ', '}") if result
-                result
-              }
-              Capistrano::Transfer.process(direction, from, to, targets, options.merge(:logger => logger), &block) unless targets.empty?
+            if target_is_io
+              pos = target.pos
+              digest = Digest.const_get(digest_method.upcase).hexdigest(target.read)
+              target.pos = pos
+            else
+              begin
+                digest = Digest.const_get(digest_method.upcase).hexdigest(File.read(target))
+              rescue SystemCallError
+                digest = nil
+              end
+            end
+            logger.debug("#{digest_method.upcase}(#{target}) = #{digest}")
+            if dry_run
+              logger.debug("transfering: #{[direction, from, to] * ', '}")
+            else
+              execute_on_servers(safe_options) do |servers|
+                targets = servers.map { |server| sessions[server] }.reject { |session|
+                  remote_digest = session.exec!("test -f #{remote_target.dump} && #{digest_cmd} #{remote_target.dump} | #{DIGEST_FILTER_CMD}")
+                  logger.debug("#{session.xserver.host}: #{digest_method.upcase}(#{remote_target}) = #{remote_digest}")
+                  result = !( digest.nil? or remote_digest.nil? ) && digest.strip == remote_digest.strip
+                  logger.info("#{session.xserver.host}: skip transfering since no changes: #{[direction, from, to] * ', '}") if result
+                  result
+                }
+                Capistrano::Transfer.process(direction, from, to, targets, safe_options.merge(:logger => logger), &block) unless targets.empty?
+              end
             end
           end
         end
