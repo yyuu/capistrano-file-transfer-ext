@@ -124,9 +124,9 @@ module Capistrano
           via = options.delete(:via)
           if via == :sudo or options.delete(:sudo) # check :sudo for backward compatibility
             # ignore {:via => :sudo} since `sudo()` cannot handle multiple commands properly.
-            try_sudo = sudo
+            _try_sudo = sudo
           else
-            try_sudo = ""
+            _try_sudo = ""
             options[:via] = via if via
           end
           # * If :mode is :preserve or :mode is not given, preserve original mode.
@@ -180,15 +180,15 @@ module Capistrano
           if block_given?
             execute << yield(from, to)
           else
-            execute << "( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )"
-            execute << "#{try_sudo} mv -f #{from.dump} #{to.dump}"
+            execute << "( test -d #{File.dirname(to).dump} || #{_try_sudo} mkdir -p #{File.dirname(to).dump} )"
+            execute << "#{_try_sudo} mv -f #{from.dump} #{to.dump}"
           end
           if mode
             mode = mode.is_a?(Numeric) ? mode.to_s(8) : mode.to_s
-            execute << "#{try_sudo} chmod #{mode.dump} #{to.dump}"
+            execute << "#{_try_sudo} chmod #{mode.dump} #{to.dump}"
           end
-          execute << "#{try_sudo} chown #{owner.to_s.dump} #{to.dump}" if owner
-          execute << "#{try_sudo} chgrp #{group.to_s.dump} #{to.dump}" if group
+          execute << "#{_try_sudo} chown #{owner.to_s.dump} #{to.dump}" if owner
+          execute << "#{_try_sudo} chgrp #{group.to_s.dump} #{to.dump}" if group
           invoke_command(execute.join(" && "), options)
         end
         alias place install
@@ -204,11 +204,17 @@ module Capistrano
         #
         def install_if_modified(from, to, options={}, &block)
           options = options.dup
+          if options[:via] == :sudo or options.delete(:sudo)
+            _try_sudo = sudo
+            options[:via] = :sudo
+          else
+            _try_sudo = ""
+          end
           digest_method = options.fetch(:digest, :md5).to_s
           digest_cmd = options.fetch(:digest_cmd, "#{digest_method.downcase}sum")
           install(from, to, options) do |from, to|
             execute = []
-            execute << %{( test -d #{File.dirname(to).dump} || #{try_sudo} mkdir -p #{File.dirname(to).dump} )}
+            execute << %{( test -d #{File.dirname(to).dump} || #{_try_sudo} mkdir -p #{File.dirname(to).dump} )}
             # calculate hexdigest of `from'
             execute << %{from=$(#{digest_cmd} #{from.dump} 2>/dev/null | #{DIGEST_FILTER_CMD} || true)}
             execute << %{echo %s} % ["#{digest_method.upcase}(#{from}) = ${from}".dump]
@@ -220,7 +226,7 @@ module Capistrano
               if [ -n "${from}" -a "${to}" ] && [ "${from}" = "${to}" ]; then
                 echo "skip installing since no changes.";
               else
-                #{try_sudo} mv -f #{from.dump} #{to.dump};
+                #{_try_sudo} mv -f #{from.dump} #{to.dump};
               fi
             EOS
             execute.join(" && ")
