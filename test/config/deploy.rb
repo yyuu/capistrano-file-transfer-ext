@@ -153,6 +153,20 @@ namespace(:test_default) {
     run("test -f #{to.dump}")
     run("test #{body.dump} = $(cat #{to.dump})")
   }
+
+  task(:test_safe_upload_directory) {
+    files = %w(x y z)
+    body = "baz"
+    from = "tmp/baz"
+    from_files = files.map { |x| File.join(from, x) }
+    to = "tmp/rbaz"
+    to_files = files.map { |x| File.join(to, x) }
+    run_locally("rm -rf #{from.dump}; mkdir -p #{from.dump}")
+    run_locally(from_files.map { |file| "echo #{body.dump} > #{file.dump}" }.join(" && "))
+    run("rm -rf #{to.dump}")
+    safe_upload(from, to)
+    run(to_files.map { |file| "test -f #{file.dump}" }.join(" && "))
+  }
 }
 
 namespace(:test_transfer_if_modified) {
