@@ -16,5 +16,4 @@ Gem::Specification.new do |gem|
   gem.version       = Capistrano::Configuration::Actions::FileTransferExt::VERSION
 
   gem.add_dependency("capistrano")
-  gem.add_development_dependency("vagrant", "~> 1.0.6")
 end
